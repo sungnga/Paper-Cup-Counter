@@ -1,10 +1,21 @@
-__author__ = 'nathan.waddington'
+__author__ = 'Nate Waddington'
+__email__ = 'nathan.waddington@akqa.com'
+
+# original code sample by andyseubert at:
 __version__ = 'https://www.raspberrypi.org/forums/viewtopic.php?f=44&t=53437'
+
+import usb
+from time import *
 
 debug = True
 
 VENDOR_ID = 0x0922
 devices = usb.core.find(find_all=True, idVendor=VENDOR_ID)
+
+serialno = '0071448049959'
+
+DATA_MODE_OUNCES = 0
+DATA_MODE_GRAMS = 1
 
 for device in devices:
     if device.is_kernel_driver_active(0) is True:
@@ -14,8 +25,8 @@ for device in devices:
     productid = str(device.idProduct)
     try:
         if str(usb.util.get_string(device, 256, 3)) == serialno:
-            if debug: print "scale id:" + id + " serial: " + serialno
-            if debug: print ("device serial:    <" + str(usb.util.get_string(device, 256, 3))) + ">"
+            if debug: print("scale id:" + id + " serial: " + serialno)
+            if debug: print(("device serial:    <" + str(usb.util.get_string(device, 256, 3))) + ">")
             ## set USB device endpoint here
             endpoint = device[0][(0, 0)][0]
             # read a data packet
@@ -24,12 +35,12 @@ for device in devices:
             while data is None:  # and attempts > 0:
                 try:
                     data = device.read(endpoint.bEndpointAddress, endpoint.wMaxPacketSize)
-                    if debug: print "data: " + str(data)
+                    if debug: print("data: " + str(data))
                 except usb.core.USBError as e:
                     data = None
                     if e.args == ('Operation timed out',):
                         attempts -= 1
-                        print e
+                        print(e)
                         continue
 
             # The raw scale array data
@@ -44,12 +55,14 @@ for device in devices:
                 weight = "%s g" % grams
 
             reading = weight
-            if debug: print "raw reading '" + reading + "'"
+            if debug: print("raw reading '" + reading + "'")
             readval = float(reading.split(" ")[0])
             readunit = reading.split(" ")[1]
             ## if the units are ounces ("oz") then convert to "g"
             if readunit == "oz" and readval != 0:
                 readval = readval * 28.3495
-                if debug: print "converted oz to g"
-            if debug: print "current weight : '" + str(readval) + "' " + readunit
-            if debug: print "current time   : " + strftime("%Y-%m-%d %H:%M:%S", localtime())
+                if debug: print("converted oz to g")
+            if debug: print("current weight : '" + str(readval) + "' " + readunit)
+            if debug: print("current time   : " + strftime("%Y-%m-%d %H:%M:%S", localtime()))
+    except:
+        pass
