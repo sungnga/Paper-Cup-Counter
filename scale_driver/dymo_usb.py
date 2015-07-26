@@ -1,68 +1,68 @@
-__author__ = 'Nate Waddington'
+__author__ = 'Nathan Waddington'
 __email__ = 'nathan.waddington@akqa.com'
+__copyright__ = 'Copyright 2015 AKQA inc. All Rights Reserved'
 
-# original code sample by andyseubert at:
-__version__ = 'https://www.raspberrypi.org/forums/viewtopic.php?f=44&t=53437'
+# original scale code samples by andyseubert at:
+__version__ = 'https://github.com/andyseubert/CoffeeScale'
 
-import usb
-from time import *
+import usb.core
+import usb.util
+import os
+import sys
+import sqlite3 as lite
+from time import localtime, strftime
 
-debug = True
+VENDOR_ID = 0x0922  # dymo vendor
+PRODUCT_ID = 0x8004  # 25lb scale -- other dymo scales have different product_ids
+DATA_MODE_GRAMS = 2
+DATA_MODE_OUNCES = 11
 
-VENDOR_ID = 0x0922
+# connect to database
+con = None
+debug = 1
+# con = lite.connect('/usr/local/CoffeeScale/c16')
+# cur = con.cursor()
+
+# find the USB Dymo scale devices
+# device = usb.core.find(idVendor=VENDOR_ID, idProduct=PRODUCT_ID)
 devices = usb.core.find(find_all=True, idVendor=VENDOR_ID)
 
-serialno = '0071448049959'
-
-DATA_MODE_OUNCES = 0
-DATA_MODE_GRAMS = 1
-
+sys.stdout.write('There are ' + str(len(devices)) + ' scales connected!\n')
+scales = []
+i = 1
 for device in devices:
-    if device.is_kernel_driver_active(0) is True:
-        device.detach_kernel_driver(0)
+    scalename = "ChangeMyName " + str(i)
+    print "scale #" + str(i)
     devbus = str(device.bus)
     devaddr = str(device.address)
     productid = str(device.idProduct)
+    # help found here http://stackoverflow.com/questions/5943847/get-string-descriptor-using-pyusb-usb-util-get-string
+    serialno = str(usb.util.get_string(device, 256, 3))
+    manufacturer = str(usb.util.get_string(device, 256, 1))
+    description = str(usb.util.get_string(device, 256, 2))
+    if debug:
+        print serialno
+        print manufacturer
+        print description
+    # look for serialnumber already existing
+#    cur.execute("select count(*) from scales where serialno='" + serialno + "'")
+    # this should produce ONE row but in case it does not I'll refer to the rows by their numeric index
+#     row = cur.fetchone()[0]  # fetchall so we can refer to the columns by name
+#     if row >= 1:
+#         print "row:" + str(row)
+#         print "serial " + serialno + " already exists in database"
+#     else:
+#         sql = "insert into scales(scale_name,vendor_id,product_id,data_mode_grams,data_mode_ounces,serialno) values ('%s', '%s', '%s', '%s', '%s', '%s')" % (
+#             scalename, str(VENDOR_ID), productid, str(DATA_MODE_GRAMS), str(DATA_MODE_OUNCES), serialno)
+#         if debug: print sql
+#         cur.execute(sql)
+#         con.commit()
+#         if debug: print "inserted new scale with serial " + serialno + " in database"
+#     i += 1
+# cur.close()
+
+for device in devices:
     try:
-        if str(usb.util.get_string(device, 256, 3)) == serialno:
-            if debug: print("scale id:" + id + " serial: " + serialno)
-            if debug: print(("device serial:    <" + str(usb.util.get_string(device, 256, 3))) + ">")
-            ## set USB device endpoint here
-            endpoint = device[0][(0, 0)][0]
-            # read a data packet
-            attempts = 10
-            data = None
-            while data is None:  # and attempts > 0:
-                try:
-                    data = device.read(endpoint.bEndpointAddress, endpoint.wMaxPacketSize)
-                    if debug: print("data: " + str(data))
-                except usb.core.USBError as e:
-                    data = None
-                    if e.args == ('Operation timed out',):
-                        attempts -= 1
-                        print(e)
-                        continue
-
-            # The raw scale array data
-            # print data
-            raw_weight = data[4] + (256 * data[5])
-
-            if data[2] == DATA_MODE_OUNCES:
-                ounces = raw_weight * 0.1
-                weight = "%s oz" % ounces
-            elif data[2] == DATA_MODE_GRAMS:
-                grams = raw_weight
-                weight = "%s g" % grams
-
-            reading = weight
-            if debug: print("raw reading '" + reading + "'")
-            readval = float(reading.split(" ")[0])
-            readunit = reading.split(" ")[1]
-            ## if the units are ounces ("oz") then convert to "g"
-            if readunit == "oz" and readval != 0:
-                readval = readval * 28.3495
-                if debug: print("converted oz to g")
-            if debug: print("current weight : '" + str(readval) + "' " + readunit)
-            if debug: print("current time   : " + strftime("%Y-%m-%d %H:%M:%S", localtime()))
-    except:
+        device.detach_kernel_driver(0)
+    except Exception, e:
         pass
