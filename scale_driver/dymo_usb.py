@@ -139,7 +139,7 @@ class DymoScale(object):
                             # determine the magnitude of the change here
                             delta = abs(readval - float(self.lastreading[i]))
                             # a small change of a few grams should not be noted
-                            if 5 < int(delta):  # or (int(round(time.time() * 1000)) - self.readmillis) > 5:
+                            if 8 < int(delta):  # or (int(round(time.time() * 1000)) - self.readmillis) > 5:
                                 if (readval != float(self.lastreading[i])):
                                     if self.debug:
                                         print "delta: " + str(delta) + " not ignoring"
