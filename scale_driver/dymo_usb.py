@@ -139,7 +139,7 @@ class DymoScale(object):
                             # determine the magnitude of the change here
                             delta = abs(readval - float(self.lastreading[i]))
                             # a small change of a few grams should not be noted
-                            if 8 < int(delta):  # or (int(round(time.time() * 1000)) - self.readmillis) > 5:
+                            if 8 < int(delta) < 6000:  # or (int(round(time.time() * 1000)) - self.readmillis) > 5:
                                 if (readval != float(self.lastreading[i])):
                                     if self.debug:
                                         print "delta: " + str(delta) + " not ignoring"
@@ -149,7 +149,7 @@ class DymoScale(object):
 
                                     # Log our data!
                                     logging.info(self.serialno + "," + reading + "," + str(readval) + "," + str(round(estnoofcups)))
-                                    print self.serialno + "," + reading + "," + str(readval) + "," + str(round(estnoofcups))
+                                    print strftime("%Y-%m-%d %H:%M:%S", localtime()) + " " + self.serialno + "," + reading + "," + str(readval) + "," + str(round(estnoofcups))
 
                                 # subprocess.call(["/usr/local/CoffeeScale/updateTweet.py",id,str(readval)])
                                 self.readmillis = int(round(time.time() * 1000))
