@@ -22,7 +22,7 @@ class DymoScale(object):
         self.PRODUCT_ID = 0x8004  # 25lb scale -- other dymo scales have different product_ids
         self.DATA_MODE_GRAMS = 2
         self.DATA_MODE_OUNCES = 11
-        self.debug = 1
+        self.debug = 0
 
         self.serialno = ''
         self.manufacturer = ''
@@ -39,7 +39,7 @@ class DymoScale(object):
                             level=logging.INFO)
 
         logging.info(
-            "Paper Cup Counter Data Format: Date time, level, scale id, serial no, raw data reading, raw data units, rounded reading in g, estimated current number of cups")
+            "Paper Cup Counter Data Format: Date time, level, scale serial no, raw data reading, raw data units, rounded reading in g, estimated current number of cups")
 
         self.logger = logging.getLogger('PaperCupCounter')
 
@@ -129,34 +129,34 @@ class DymoScale(object):
                         estnoofcups = readval / 10.8
                         readval = round(readval)
                         if self.debug: print "rounded read value is: " + str(readval)
-                        if self.debug: print "est. no. of cups: " + str(readval / 10.8)
-
-
-                        # Log our data!
-                        logging.info(
-                            id + "," + self.serialno + "," + reading + "," + str(readval) + "," + str(estnoofcups))
+                        if self.debug: print "est. no. of cups: " + str(round(readval / 10.8))
 
                         ## compare the cached value with the current value
-                        # if (readval != float(self.lastreading[i])) or (
-                        #     int(round(time.time() * 1000)) - self.readmillis) > 5:
-                        #     ## if different then update the database and update the cache
-                        #
-                        #     # determine the magnitude of the change here
-                        #     delta = abs(readval - float(self.lastreading[i]))
-                        #     # a small change of a few grams should not be noted
-                        #     if 10 < int(delta) < 6000:  # or (int(round(time.time() * 1000)) - self.readmillis) > 5:
-                        #         if (readval != float(self.lastreading[i])):
-                        #             if self.debug:
-                        #                 print "delta: " + str(delta) + " not ignoring"
-                        #                 print "scale " + id + " reading changed from " + str(
-                        #                     self.lastreading[i]) + " to " + str(readval)
-                        #                 # sendReading(id, readval)
-                        #         # subprocess.call(["/usr/local/CoffeeScale/updateTweet.py",id,str(readval)])
-                        #         self.readmillis = int(round(time.time() * 1000))
-                        # else:
-                        #     if self.debug: print "reading unchanged"
-                        # ## set the last read value to the current read value
-                        # self.lastreading[i] = readval
+                        if (readval != float(self.lastreading[i])) or (
+                            int(round(time.time() * 1000)) - self.readmillis) > 5:
+                            ## if different then update the database and update the cache
+
+                            # determine the magnitude of the change here
+                            delta = abs(readval - float(self.lastreading[i]))
+                            # a small change of a few grams should not be noted
+                            if 5 < int(delta):  # or (int(round(time.time() * 1000)) - self.readmillis) > 5:
+                                if (readval != float(self.lastreading[i])):
+                                    if self.debug:
+                                        print "delta: " + str(delta) + " not ignoring"
+                                        print "scale " + id + " reading changed from " + str(
+                                            self.lastreading[i]) + " to " + str(readval)
+                                        # sendReading(id, readval)
+
+                                    # Log our data!
+                                    logging.info(self.serialno + "," + reading + "," + str(readval) + "," + str(round(estnoofcups)))
+                                    print self.serialno + "," + reading + "," + str(readval) + "," + str(round(estnoofcups))
+
+                                # subprocess.call(["/usr/local/CoffeeScale/updateTweet.py",id,str(readval)])
+                                self.readmillis = int(round(time.time() * 1000))
+                        else:
+                            if self.debug: print "reading unchanged"
+                        ## set the last read value to the current read value
+                        self.lastreading[i] = readval
                 except usb.core.USBError as e:
                     print "usb core error:"
                     print e
