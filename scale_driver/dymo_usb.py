@@ -10,59 +10,151 @@ import usb.util
 import os
 import sys
 import sqlite3 as lite
+import time
 from time import localtime, strftime
 
-VENDOR_ID = 0x0922  # dymo vendor
-PRODUCT_ID = 0x8004  # 25lb scale -- other dymo scales have different product_ids
-DATA_MODE_GRAMS = 2
-DATA_MODE_OUNCES = 11
+# import logging
 
-# connect to database
-con = None
-debug = 1
-# con = lite.connect('/usr/local/CoffeeScale/c16')
-# cur = con.cursor()
 
-# find the USB Dymo scale devices
-# device = usb.core.find(idVendor=VENDOR_ID, idProduct=PRODUCT_ID)
-devices = usb.core.find(find_all=True, idVendor=VENDOR_ID)
+class DymoScale(object):
+    def __init__(self):
+        self.VENDOR_ID = 0x0922  # dymo vendor
+        self.PRODUCT_ID = 0x8004  # 25lb scale -- other dymo scales have different product_ids
+        self.DATA_MODE_GRAMS = 2
+        self.DATA_MODE_OUNCES = 11
+        self.debug = 1
 
-sys.stdout.write('There are ' + str(len(devices)) + ' scales connected!\n')
-scales = []
-i = 1
-for device in devices:
-    scalename = "ChangeMyName " + str(i)
-    print "scale #" + str(i)
-    devbus = str(device.bus)
-    devaddr = str(device.address)
-    productid = str(device.idProduct)
-    # help found here http://stackoverflow.com/questions/5943847/get-string-descriptor-using-pyusb-usb-util-get-string
-    serialno = str(usb.util.get_string(device, 256, 3))
-    manufacturer = str(usb.util.get_string(device, 256, 1))
-    description = str(usb.util.get_string(device, 256, 2))
-    if debug:
-        print serialno
-        print manufacturer
-        print description
-    # look for serialnumber already existing
-#    cur.execute("select count(*) from scales where serialno='" + serialno + "'")
-    # this should produce ONE row but in case it does not I'll refer to the rows by their numeric index
-#     row = cur.fetchone()[0]  # fetchall so we can refer to the columns by name
-#     if row >= 1:
-#         print "row:" + str(row)
-#         print "serial " + serialno + " already exists in database"
-#     else:
-#         sql = "insert into scales(scale_name,vendor_id,product_id,data_mode_grams,data_mode_ounces,serialno) values ('%s', '%s', '%s', '%s', '%s', '%s')" % (
-#             scalename, str(VENDOR_ID), productid, str(DATA_MODE_GRAMS), str(DATA_MODE_OUNCES), serialno)
-#         if debug: print sql
-#         cur.execute(sql)
-#         con.commit()
-#         if debug: print "inserted new scale with serial " + serialno + " in database"
-#     i += 1
-# cur.close()
+        self.serialno = ''
+        self.manufacturer = ''
+        self.description = ''
+        self.scales = []
 
-for device in devices:
-    try:
-        device.detach_kernel_driver(0)
-    except Exception, e:
-        pass
+        self.devices = usb.core.find(find_all=True, idVendor=self.VENDOR_ID)
+        self.lastreading = []
+        self.readmillis = 0
+
+        # logging.basicConfig(filename='../logs/current.log', filemode='a',
+        #                     format='%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',
+        #                     datefmt='%H:%M:%S',
+        #                     level=logging.INFO)
+        #
+        # logging.info("Paper Cup Counter")
+        #
+        # self.logger = logging.getLogger('PaperCupCounter')
+
+    def connect_scales(self):
+        # find the USB Dymo scale devices
+
+
+        sys.stdout.write('There are ' + str(len(self.devices)) + ' scales connected!\n')
+
+        i = 1
+        for device in self.devices:
+            scalename = "ChangeMyName " + str(i)
+            print "scale #" + str(i)
+            devbus = str(device.bus)
+            devaddr = str(device.address)
+            productid = str(device.idProduct)
+
+            # help found here http://stackoverflow.com/questions/5943847/get-string-descriptor-using-pyusb-usb-util-get-string
+            self.serialno = str(usb.util.get_string(device, 256, 3))
+            self.manufacturer = str(usb.util.get_string(device, 256, 1))
+            self.description = str(usb.util.get_string(device, 256, 2))
+            if self.debug:
+                print self.serialno
+                print self.manufacturer
+                print self.description
+
+        for i in range(0, len(self.devices)):
+            self.lastreading.append(0)
+
+    def monitor_scales(self):
+        for i in range(0, len(self.devices)):
+            # if self.debug:
+            #     print "\nscale serial:" + self.serialno + " is id " + id
+            #     print "last reading: " + str(self.lastreading[i])
+            time.sleep(.5)  # please only one reading per second
+
+            id = str(i)
+
+            for device in self.devices:
+                if device.is_kernel_driver_active(0) is True:
+                    device.detach_kernel_driver(0)
+                devbus = str(device.bus)
+                devaddr = str(device.address)
+                productid = str(device.idProduct)
+                try:
+                    if str(usb.util.get_string(device, 256, 3)) == self.serialno:
+                        if self.debug: print "scale id:" + id + " serial: " + self.serialno
+                        if self.debug: print ("device serial:    <" + str(usb.util.get_string(device, 256, 3))) + ">"
+                        ## set USB device endpoint here
+                        endpoint = device[0][(0, 0)][0]
+                        # read a data packet
+                        attempts = 10
+                        data = None
+                        while data is None:  # and attempts > 0:
+                            try:
+                                data = device.read(endpoint.bEndpointAddress, endpoint.wMaxPacketSize)
+                                if self.debug: print "data: " + str(data)
+                            except usb.core.USBError as e:
+                                data = None
+                                if e.args == ('Operation timed out',):
+                                    attempts -= 1
+                                    print e
+                                    continue
+
+                        # The raw scale array data
+                        # print data
+                        raw_weight = data[4] + (256 * data[5])
+
+                        if data[2] == self.DATA_MODE_OUNCES:
+                            ounces = raw_weight * 0.1
+                            weight = "%s oz" % ounces
+                        elif data[2] == self.DATA_MODE_GRAMS:
+                            grams = raw_weight
+                            weight = "%s g" % grams
+
+                        reading = weight
+                        if self.debug: print "raw reading '" + reading + "'"
+                        readval = float(reading.split(" ")[0])
+                        readunit = reading.split(" ")[1]
+                        ## if the units are ounces ("oz") then convert to "g"
+                        if readunit == "oz" and readval != 0:
+                            readval = readval * 28.3495
+                            readunit = "g"
+                            if self.debug: print "converted oz to g"
+                        if self.debug: print "current weight : '" + str(readval) + "' " + readunit
+                        if self.debug: print "current time   : " + strftime("%Y-%m-%d %H:%M:%S", localtime())
+                        readval = round(readval)
+                        if self.debug: print "rounded read value is: " + str(readval)
+                        ## compare the cached value with the current value
+                        if (readval != float(self.lastreading[i])) or (
+                            int(round(time.time() * 1000)) - self.readmillis) > 5:
+                            ## if different then update the database and update the cache
+
+                            # determine the magnitude of the change here
+                            delta = abs(readval - float(self.lastreading[i]))
+                            # a small change of a few grams should not be noted
+                            if 10 < int(delta) < 6000:  # or (int(round(time.time() * 1000)) - self.readmillis) > 5:
+                                if (readval != float(self.lastreading[i])):
+                                    if self.debug:
+                                        print "delta: " + str(delta) + " not ignoring"
+                                        print "scale " + id + " reading changed from " + str(
+                                            self.lastreading[i]) + " to " + str(readval)
+                                        # sendReading(id, readval)
+                                # subprocess.call(["/usr/local/CoffeeScale/updateTweet.py",id,str(readval)])
+                                self.readmillis = int(round(time.time() * 1000))
+                        else:
+                            if self.debug: print "reading unchanged"
+                        ## set the last read value to the current read value
+                        self.lastreading[i] = readval
+                except usb.core.USBError as e:
+                    print "usb core error:"
+                    print e
+
+    def cleanup(self):
+        for device in self.devices:
+            try:
+                device.detach_kernel_driver(0)
+            except Exception, e:
+                pass

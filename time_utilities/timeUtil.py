@@ -8,7 +8,7 @@ import time
 
 import socket
 import datetime
-from subprocess import *
+import subprocess
 from dateutil import parser
 
 # Time Stuff
@@ -38,9 +38,9 @@ class TimeUtil(object):
                        0,  # millisecond
         )
         self._set_system_time(time_tuple)  # we have NIST time so set the system clock so we don't have to ask again.
-        print("init time")
-        # Boot info
-        cmd = "ip addr show wlan0 | grep inet | awk '{print $2}' | cut -d/ -f1"  # get the device ip address
+        print("Time set")
+        cmd = ['date', '']
+        p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
     def _set_system_time(self, time_tuple):  # time-stuffs
         CLOCK_REALTIME = 0
