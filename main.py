@@ -5,12 +5,12 @@ __email__ = 'nathan.waddington@akqa.com'
 __copyright__ = 'Copyright 2015 AKQA inc. All Rights Reserved'
 __version__ = ''
 
-import sys
 from time_utilities.timeUtil import TimeUtil
 import RPi.GPIO as GPIO
 from scale_driver.dymo_usb import *
 
 ds = DymoScale()
+
 
 def main():
     """main"""
@@ -24,8 +24,6 @@ def main():
     # main loop
     while True:
         ds.monitor_scales()
-        # coffeeMachine1.count()
-        # coffeeMachine2.count()
 
 
 if __name__ == '__main__':
