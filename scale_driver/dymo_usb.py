@@ -150,14 +150,15 @@ class DymoScale(object):
                                             self.lastreading[i]) + " to " + str(readval)
                                         # sendReading(id, readval)
 
-                                    self.differential =  round(estnoofcups) - self.last_estimated_number_of_cups
+                                    self.differential = round(estnoofcups) - self.last_estimated_number_of_cups
 
                                     # Log our data!
-                                    logging.info(self.serialno + "," + reading + "," + str(readval) + "," + str(
+                                    logging.warning(self.serialno + "," + reading + "," + str(readval) + "," + str(
                                         round(estnoofcups)) + ',' + str(self.differential))
 
                                     timestamp = str(datetime.datetime.now())
-                                    print timestamp + " " + self.serialno + "," + reading + "," + str(readval) + "," + str(round(estnoofcups)) + "," + str(self.differential)
+                                    print timestamp + " " + self.serialno + "," + reading + "," + str(
+                                        readval) + "," + str(round(estnoofcups)) + "," + str(self.differential)
 
                                     # TODO: send this thing out to firebase.io
                                     # Date time, scale serial no, raw data reading, raw data units, rounded reading in g, estimated current number of cups
