@@ -11,6 +11,8 @@ import sys
 import time
 from time import localtime, strftime
 import logging
+from firebase_connector import firebase_paper_cup_counter
+import datetime
 
 
 class DymoScale(object):
@@ -148,9 +150,20 @@ class DymoScale(object):
                                     # Log our data!
                                     logging.info(self.serialno + "," + reading + "," + str(readval) + "," + str(
                                         round(estnoofcups)))
-                                    print strftime("%Y-%m-%d %H:%M:%S",
-                                                   localtime()) + " " + self.serialno + "," + reading + "," + str(
+
+                                    timestamp = str(datetime.datetime.now())
+                                    print timestamp + " " + self.serialno + "," + reading + "," + str(
                                         readval) + "," + str(round(estnoofcups))
+
+                                    # TODO: send this thing out to firebase.io
+                                    # Date time, scale serial no, raw data reading, raw data units, rounded reading in g, estimated current number of cups
+                                    paperCupCountJson = {'timestamp': timestamp, 'serialno': self.serialno,
+                                                         'raw_data_reading': reading,
+                                                         'rounded_data_reading': readval,
+                                                         'estimated_no_cups': round(estnoofcups)}
+
+                                    # paperCupCountJson = {'timestamp': timestamp, 'serialno': '1234567890', 'raw_data_reading': '0', 'rounded_data_reading': '0', 'estimated_no_cups': '0'}
+                                    firebase_paper_cup_counter.firebase_post(paperCupCountJson)
 
                                 # subprocess.call(["/usr/local/CoffeeScale/updateTweet.py",id,str(readval)])
                                 self.readmillis = int(round(time.time() * 1000))
