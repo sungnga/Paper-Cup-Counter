@@ -7,19 +7,18 @@ __version__ = 'https://github.com/andyseubert/CoffeeScale'
 
 import usb.core
 import usb.util
-import os
 import sys
-import sqlite3 as lite
 import time
 from time import localtime, strftime
-
 import logging
+from firebase_connector import firebase_paper_cup_counter
+import datetime
 
 
 class DymoScale(object):
     def __init__(self):
         self.VENDOR_ID = 0x0922  # dymo vendor
-        self.PRODUCT_ID = 0x8004  # 25lb scale -- other dymo scales have different product_ids
+        self.PRODUCT_ID = 0x8004  # 25lb scale -- other dymo scales have different product_ids # Todo: find 10lb prod id
         self.DATA_MODE_GRAMS = 2
         self.DATA_MODE_OUNCES = 11
         self.debug = 0
@@ -33,20 +32,22 @@ class DymoScale(object):
         self.lastreading = []
         self.readmillis = 0
 
+        self.last_estimated_number_of_cups = 0
+        self.differential = 0
+
         logging.basicConfig(filename='/home/pi/Paper-Cup-Counter/logs/current.log', filemode='a',
                             format='%(asctime)s.%(msecs)d,%(levelname)s,%(message)s',
                             datefmt='%Y-%m-%d %H:%M:%S',
                             level=logging.INFO)
 
         logging.info(
-            "Paper Cup Counter Data Format: Date time, level, scale serial no, raw data reading, raw data units, rounded reading in g, estimated current number of cups")
+            "Paper Cup Counter Data Format: Date time, level, scale serial no, raw data reading, raw data units, " +
+            "rounded reading in g, estimated current number of cups, differential")
 
         self.logger = logging.getLogger('PaperCupCounter')
 
     def connect_scales(self):
         # find the USB Dymo scale devices
-
-
         sys.stdout.write('There are ' + str(len(self.devices)) + ' scales connected!\n')
 
         i = 1
@@ -57,7 +58,8 @@ class DymoScale(object):
             devaddr = str(device.address)
             productid = str(device.idProduct)
 
-            # help found here http://stackoverflow.com/questions/5943847/get-string-descriptor-using-pyusb-usb-util-get-string
+            # help found here
+            # http://stackoverflow.com/questions/5943847/get-string-descriptor-using-pyusb-usb-util-get-string
             self.serialno = str(usb.util.get_string(device, 256, 3))
             self.manufacturer = str(usb.util.get_string(device, 256, 1))
             self.description = str(usb.util.get_string(device, 256, 2))
@@ -71,9 +73,7 @@ class DymoScale(object):
 
     def monitor_scales(self):
         for i in range(0, len(self.devices)):
-            # if self.debug:
-            #     print "\nscale serial:" + self.serialno + " is id " + id
-            #     print "last reading: " + str(self.lastreading[i])
+
             time.sleep(.5)  # please only one reading per second
 
             id = str(i)
@@ -87,7 +87,7 @@ class DymoScale(object):
                 try:
                     if str(usb.util.get_string(device, 256, 3)) == self.serialno:
 
-                        ## set USB device endpoint here
+                        # set USB device endpoint here
                         endpoint = device[0][(0, 0)][0]
                         # read a data packet
                         attempts = 10
@@ -104,7 +104,6 @@ class DymoScale(object):
                                     continue
 
                         # The raw scale array data
-                        # print data
                         raw_weight = data[4] + (256 * data[5])
 
                         if data[2] == self.DATA_MODE_OUNCES:
@@ -117,24 +116,28 @@ class DymoScale(object):
                         reading = weight
 
                         if self.debug: print "raw reading '" + reading + "'"
+
                         readval = float(reading.split(",")[0])
                         readunit = reading.split(",")[1]
-                        ## if the units are ounces ("oz") then convert to "g"
+
+                        # if the units are ounces ("oz") then convert to "g"
                         if readunit == "oz" and readval != 0:
                             readval = readval * 28.3495
                             readunit = "g"
                             if self.debug: print "converted oz to g"
                         if self.debug: print "current weight : '" + str(readval) + "' " + readunit
                         if self.debug: print "current time   : " + strftime("%Y-%m-%d %H:%M:%S", localtime())
+
                         estnoofcups = readval / 10.8
                         readval = round(readval)
+
                         if self.debug: print "rounded read value is: " + str(readval)
                         if self.debug: print "est. no. of cups: " + str(round(readval / 10.8))
 
-                        ## compare the cached value with the current value
+                        # compare the cached value with the current value
                         if (readval != float(self.lastreading[i])) or (
-                            int(round(time.time() * 1000)) - self.readmillis) > 5:
-                            ## if different then update the database and update the cache
+                                    int(round(time.time() * 1000)) - self.readmillis) > 5:
+                            # if different then update the database and update the cache
 
                             # determine the magnitude of the change here
                             delta = abs(readval - float(self.lastreading[i]))
@@ -145,17 +148,33 @@ class DymoScale(object):
                                         print "delta: " + str(delta) + " not ignoring"
                                         print "scale " + id + " reading changed from " + str(
                                             self.lastreading[i]) + " to " + str(readval)
-                                        # sendReading(id, readval)
+
+                                    self.differential = round(estnoofcups) - self.last_estimated_number_of_cups
 
                                     # Log our data!
-                                    logging.info(self.serialno + "," + reading + "," + str(readval) + "," + str(round(estnoofcups)))
-                                    print strftime("%Y-%m-%d %H:%M:%S", localtime()) + " " + self.serialno + "," + reading + "," + str(readval) + "," + str(round(estnoofcups))
+                                    logging.warning(self.serialno + "," + reading + "," + str(readval) + "," + str(
+                                        round(estnoofcups)) + ',' + str(self.differential))
 
-                                # subprocess.call(["/usr/local/CoffeeScale/updateTweet.py",id,str(readval)])
+                                    timestamp = str(datetime.datetime.now())
+                                    print timestamp + " " + self.serialno + "," + reading + "," + str(
+                                        readval) + "," + str(round(estnoofcups)) + "," + str(self.differential)
+
+                                    # send the data out to firebase.io
+                                    paperCupCountJson = {'timestamp': timestamp, 'serialno': self.serialno,
+                                                         'raw_data_reading': reading,
+                                                         'rounded_data_reading': readval,
+                                                         'estimated_no_cups': round(estnoofcups),
+                                                         'differential': self.differential}
+
+                                    firebase_paper_cup_counter.firebase_post(paperCupCountJson)
+
+                                    # update last count
+                                    self.last_estimated_number_of_cups = round(estnoofcups)
+
                                 self.readmillis = int(round(time.time() * 1000))
                         else:
                             if self.debug: print "reading unchanged"
-                        ## set the last read value to the current read value
+                        # set the last read value to the current read value
                         self.lastreading[i] = readval
                 except usb.core.USBError as e:
                     print "usb core error:"
