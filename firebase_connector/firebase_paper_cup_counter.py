@@ -12,6 +12,6 @@ def firebase_post(json):
         today = datetime.datetime.now()
         url = '/paper_cup_count/' + str(today).split(' ')[0]
         result = _firebase.post(url, json)
-        # if debug: print result
+
     except requests.exceptions.ConnectionError as e:
         print str(e)

@@ -18,7 +18,7 @@ import datetime
 class DymoScale(object):
     def __init__(self):
         self.VENDOR_ID = 0x0922  # dymo vendor
-        self.PRODUCT_ID = 0x8004  # 25lb scale -- other dymo scales have different product_ids
+        self.PRODUCT_ID = 0x8004  # 25lb scale -- other dymo scales have different product_ids # Todo: find 10lb prod id
         self.DATA_MODE_GRAMS = 2
         self.DATA_MODE_OUNCES = 11
         self.debug = 0
@@ -48,7 +48,6 @@ class DymoScale(object):
 
     def connect_scales(self):
         # find the USB Dymo scale devices
-
         sys.stdout.write('There are ' + str(len(self.devices)) + ' scales connected!\n')
 
         i = 1
@@ -74,9 +73,7 @@ class DymoScale(object):
 
     def monitor_scales(self):
         for i in range(0, len(self.devices)):
-            # if self.debug:
-            #     print "\nscale serial:" + self.serialno + " is id " + id
-            #     print "last reading: " + str(self.lastreading[i])
+
             time.sleep(.5)  # please only one reading per second
 
             id = str(i)
@@ -107,7 +104,6 @@ class DymoScale(object):
                                     continue
 
                         # The raw scale array data
-                        # print data
                         raw_weight = data[4] + (256 * data[5])
 
                         if data[2] == self.DATA_MODE_OUNCES:
@@ -120,8 +116,10 @@ class DymoScale(object):
                         reading = weight
 
                         if self.debug: print "raw reading '" + reading + "'"
+
                         readval = float(reading.split(",")[0])
                         readunit = reading.split(",")[1]
+
                         # if the units are ounces ("oz") then convert to "g"
                         if readunit == "oz" and readval != 0:
                             readval = readval * 28.3495
@@ -129,8 +127,10 @@ class DymoScale(object):
                             if self.debug: print "converted oz to g"
                         if self.debug: print "current weight : '" + str(readval) + "' " + readunit
                         if self.debug: print "current time   : " + strftime("%Y-%m-%d %H:%M:%S", localtime())
+
                         estnoofcups = readval / 10.8
                         readval = round(readval)
+
                         if self.debug: print "rounded read value is: " + str(readval)
                         if self.debug: print "est. no. of cups: " + str(round(readval / 10.8))
 
@@ -148,7 +148,6 @@ class DymoScale(object):
                                         print "delta: " + str(delta) + " not ignoring"
                                         print "scale " + id + " reading changed from " + str(
                                             self.lastreading[i]) + " to " + str(readval)
-                                        # sendReading(id, readval)
 
                                     self.differential = round(estnoofcups) - self.last_estimated_number_of_cups
 
@@ -160,20 +159,18 @@ class DymoScale(object):
                                     print timestamp + " " + self.serialno + "," + reading + "," + str(
                                         readval) + "," + str(round(estnoofcups)) + "," + str(self.differential)
 
-                                    # TODO: send this thing out to firebase.io
-                                    # Date time, scale serial no, raw data reading, raw data units, rounded reading in g, estimated current number of cups
+                                    # send the data out to firebase.io
                                     paperCupCountJson = {'timestamp': timestamp, 'serialno': self.serialno,
                                                          'raw_data_reading': reading,
                                                          'rounded_data_reading': readval,
                                                          'estimated_no_cups': round(estnoofcups),
                                                          'differential': self.differential}
 
-                                    # paperCupCountJson = {'timestamp': timestamp, 'serialno': '1234567890', 'raw_data_reading': '0', 'rounded_data_reading': '0', 'estimated_no_cups': '0'}
                                     firebase_paper_cup_counter.firebase_post(paperCupCountJson)
 
+                                    # update last count
                                     self.last_estimated_number_of_cups = round(estnoofcups)
 
-                                # subprocess.call(["/usr/local/CoffeeScale/updateTweet.py",id,str(readval)])
                                 self.readmillis = int(round(time.time() * 1000))
                         else:
                             if self.debug: print "reading unchanged"
