@@ -32,6 +32,9 @@ class DymoScale(object):
         self.lastreading = []
         self.readmillis = 0
 
+        self.last_estimated_number_of_cups = 0
+        self.differential = 0
+
         logging.basicConfig(filename='/home/pi/Paper-Cup-Counter/logs/current.log', filemode='a',
                             format='%(asctime)s.%(msecs)d,%(levelname)s,%(message)s',
                             datefmt='%Y-%m-%d %H:%M:%S',
@@ -39,7 +42,7 @@ class DymoScale(object):
 
         logging.info(
             "Paper Cup Counter Data Format: Date time, level, scale serial no, raw data reading, raw data units, " +
-            "rounded reading in g, estimated current number of cups")
+            "rounded reading in g, estimated current number of cups, differential")
 
         self.logger = logging.getLogger('PaperCupCounter')
 
@@ -147,23 +150,27 @@ class DymoScale(object):
                                             self.lastreading[i]) + " to " + str(readval)
                                         # sendReading(id, readval)
 
+                                    self.differential =  round(estnoofcups) - self.last_estimated_number_of_cups
+
                                     # Log our data!
                                     logging.info(self.serialno + "," + reading + "," + str(readval) + "," + str(
-                                        round(estnoofcups)))
+                                        round(estnoofcups)) + ',' + str(self.differential))
 
                                     timestamp = str(datetime.datetime.now())
-                                    print timestamp + " " + self.serialno + "," + reading + "," + str(
-                                        readval) + "," + str(round(estnoofcups))
+                                    print timestamp + " " + self.serialno + "," + reading + "," + str(readval) + "," + str(round(estnoofcups)) + "," + str(self.differential)
 
                                     # TODO: send this thing out to firebase.io
                                     # Date time, scale serial no, raw data reading, raw data units, rounded reading in g, estimated current number of cups
                                     paperCupCountJson = {'timestamp': timestamp, 'serialno': self.serialno,
                                                          'raw_data_reading': reading,
                                                          'rounded_data_reading': readval,
-                                                         'estimated_no_cups': round(estnoofcups)}
+                                                         'estimated_no_cups': round(estnoofcups),
+                                                         'differential': self.differential}
 
                                     # paperCupCountJson = {'timestamp': timestamp, 'serialno': '1234567890', 'raw_data_reading': '0', 'rounded_data_reading': '0', 'estimated_no_cups': '0'}
                                     firebase_paper_cup_counter.firebase_post(paperCupCountJson)
+
+                                    self.last_estimated_number_of_cups = round(estnoofcups)
 
                                 # subprocess.call(["/usr/local/CoffeeScale/updateTweet.py",id,str(readval)])
                                 self.readmillis = int(round(time.time() * 1000))
