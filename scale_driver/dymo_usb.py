@@ -21,6 +21,7 @@ class DymoScale(object):
         self.PRODUCT_ID = 0x8004  # 25lb scale -- other dymo scales have different product_ids # Todo: find 10lb prod id
         self.DATA_MODE_GRAMS = 2
         self.DATA_MODE_OUNCES = 11
+
         self.debug = 0
 
         self.serialno = ''
@@ -32,6 +33,7 @@ class DymoScale(object):
         self.lastreading = []
         self.readmillis = 0
 
+        self.CUP_WEIGHT_IN_G = 10.8  # Magic number! We think that a cup weighs between 10g and 10.8g
         self.last_estimated_number_of_cups = 0
         self.differential = 0
 
@@ -128,11 +130,11 @@ class DymoScale(object):
                         if self.debug: print "current weight : '" + str(readval) + "' " + readunit
                         if self.debug: print "current time   : " + strftime("%Y-%m-%d %H:%M:%S", localtime())
 
-                        estnoofcups = readval / 10.8
+                        estnoofcups = readval / self.CUP_WEIGHT_IN_G
                         readval = round(readval)
 
                         if self.debug: print "rounded read value is: " + str(readval)
-                        if self.debug: print "est. no. of cups: " + str(round(readval / 10.8))
+                        if self.debug: print "est. no. of cups: " + str(estnoofcups)
 
                         # compare the cached value with the current value
                         if (readval != float(self.lastreading[i])) or (
