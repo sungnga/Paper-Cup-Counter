@@ -13,5 +13,8 @@ def firebase_post(json):
         url = '/paper_cup_count/' + str(today).split(' ')[0]
         result = _firebase.post(url, json)
 
-    except requests.exceptions.ConnectionError as e:
+        url = '/paper_cup_count/' + str(today).split(' ')[0] + '/' +  str(today).split(' ')[1].split(':')[0]
+        result = _firebase.post(url, json)
+
+    except requests.exceptions.ConnectionError or requests.exceptions.Timeout as e:
         print str(e)
