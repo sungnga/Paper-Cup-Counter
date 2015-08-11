@@ -1,3 +1,5 @@
+from __future__ import division
+
 __author__ = 'Nathan Waddington'
 __email__ = 'nathan.waddington@akqa.com'
 __copyright__ = 'Copyright 2015 AKQA inc. All Rights Reserved'
@@ -21,6 +23,7 @@ class DymoScale(object):
         self.PRODUCT_ID = 0x8004  # 25lb scale -- other dymo scales have different product_ids # Todo: find 10lb prod id
         self.DATA_MODE_GRAMS = 2
         self.DATA_MODE_OUNCES = 11
+
         self.debug = 0
 
         self.serialno = ''
@@ -32,6 +35,7 @@ class DymoScale(object):
         self.lastreading = []
         self.readmillis = 0
 
+        self.CUP_WEIGHT_IN_G = 10.0  # We think that a cup weighs between 10g and 10.8g
         self.last_estimated_number_of_cups = 0
         self.differential = 0
 
@@ -108,12 +112,10 @@ class DymoScale(object):
 
                         if data[2] == self.DATA_MODE_OUNCES:
                             ounces = raw_weight * 0.1
-                            weight = "%s,oz" % ounces
+                            reading = "%s,oz" % ounces
                         elif data[2] == self.DATA_MODE_GRAMS:
                             grams = raw_weight
-                            weight = "%s,g" % grams
-
-                        reading = weight
+                            reading = "%s,g" % grams
 
                         if self.debug: print "raw reading '" + reading + "'"
 
@@ -125,25 +127,30 @@ class DymoScale(object):
                             readval = readval * 28.3495
                             readunit = "g"
                             if self.debug: print "converted oz to g"
+
                         if self.debug: print "current weight : '" + str(readval) + "' " + readunit
                         if self.debug: print "current time   : " + strftime("%Y-%m-%d %H:%M:%S", localtime())
 
-                        estnoofcups = readval / 10.8
-                        readval = round(readval)
 
-                        if self.debug: print "rounded read value is: " + str(readval)
-                        if self.debug: print "est. no. of cups: " + str(round(readval / 10.8))
+                        # print '********'
+                        # print str(readval) + ', ' + str(self.CUP_WEIGHT_IN_G) + ', ' + str(readval / self.CUP_WEIGHT_IN_G)
+
+                        estnoofcups = readval / float(self.CUP_WEIGHT_IN_G)
+                        # readval = round(readval)
+
+                        # if self.debug: print "rounded read value is: " + str(readval)
+                        if self.debug: print "est. no. of cups: " + str(estnoofcups)
 
                         # compare the cached value with the current value
-                        if (readval != float(self.lastreading[i])) or (
-                                    int(round(time.time() * 1000)) - self.readmillis) > 5:
+                        if (readval != float(self.lastreading[i])) or (int(round(time.time() * 1000)) - self.readmillis) > 5:
                             # if different then update the database and update the cache
 
                             # determine the magnitude of the change here
                             delta = abs(readval - float(self.lastreading[i]))
+
                             # a small change of a few grams should not be noted
-                            if 8 < int(delta) < 6000:  # or (int(round(time.time() * 1000)) - self.readmillis) > 5:
-                                if (readval != float(self.lastreading[i])):
+                            if 7 < int(delta) < 6000:
+                                if readval != float(self.lastreading[i]):
                                     if self.debug:
                                         print "delta: " + str(delta) + " not ignoring"
                                         print "scale " + id + " reading changed from " + str(
